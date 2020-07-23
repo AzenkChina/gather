@@ -7,10 +7,10 @@ int main(int argc, char *argv[])
 	CGXDLMSSecureClient *cl;
 
 	cl = new CGXDLMSSecureClient(true,
-								this->para.client,
-								(1 << 30) | (this->para.logical << 16),
-								this->para.level,
-								this->para.password.ToString().data(),
+								16,
+								(1 << 30) | (1 << 16),
+								DLMS_AUTHENTICATION_HIGH_GMAC,
+								"30303030303030303030303030303030",
 								DLMS_INTERFACE_TYPE_HDLC);
 	delete cl;
 
