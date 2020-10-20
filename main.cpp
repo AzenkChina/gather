@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
 	CGXByteBuffer bb;
 	bb.Clear();
 	std::string value;
-	if(this->comm->Read(&Object, 2, &bb, value) != DLMS_ERROR_CODE_OK) {
+	if(comm->Read(&Object, 2, &bb, value) != DLMS_ERROR_CODE_OK) {
 		std::cout << "读取失败" << std::endl;
 	}
 	else {
