@@ -61,17 +61,15 @@ int main(int argc, char *argv[])
 
 	CGXDLMSCommon Object(8, "0.0.1.0.0.255");
 
-	CGXByteBuffer bb;
-	bb.Clear();
 	std::string value;
-	if(comm->Read(&Object, 2, &bb, value) != DLMS_ERROR_CODE_OK) {
+	if(comm->Read(&Object, 2, value) != DLMS_ERROR_CODE_OK) {
 		std::cout << "读取失败" << std::endl;
 	}
 	else {
 		std::cout << "读取成功： ";
 		for (unsigned int n = 0; n < value.size(); n++) {
 			std::cout.setf(std::ios::hex);
-			std::cout << static_cast<unsigned char>(value.data()[n]);
+			std::cout << (static_cast<unsigned char>(value.data()[n]) & 0x000000ff);
 			std::cout.unsetf(std::ios::hex);
 			std::cout << " ";
 		}
