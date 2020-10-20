@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
 
 	comm = new CGXCommunication(cl, 6000, GX_TRACE_LEVEL_OFF, nullptr);
 
-	if(comm->Open("/dev/ttyS1:9600:8:Even:0", false, 115200) != 0) {
+	if(comm->Open("/dev/ttyS1:9600:8Even0", false, 115200) != 0) {
 		delete comm;
 		delete cl;
 		std::cout << "打开串口出错" << std::endl;
