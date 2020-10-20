@@ -8,7 +8,7 @@ int main(int argc, char *argv[])
 
 	cl = new CGXDLMSSecureClient(true, 16,
 								((3 << 30) | (1 << 16) | 1530),
-								DLMS_AUTHENTICATION_LOW,
+								DLMS_AUTHENTICATION_NONE,
 								nullptr,
 								DLMS_INTERFACE_TYPE_HDLC);
 
