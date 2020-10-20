@@ -44,14 +44,14 @@ int main(int argc, char *argv[])
 
 	comm = new CGXCommunication(cl, 6000, GX_TRACE_LEVEL_OFF, nullptr);
 
-	if((ret = comm->Open("/dev/ttyS1", false, 115200)) != 0) {
+	if(comm->Open("/dev/ttyS1", false, 115200) != 0) {
 		delete comm;
 		delete cl;
 		std::cout << "打开串口出错" << std::endl;
 		return -1;
 	}
 
-    if((ret = comm->InitializeConnection()) != 0) {
+    if(comm->InitializeConnection() != 0) {
         comm->Close();
         delete comm;
         delete cl;
@@ -70,9 +70,9 @@ int main(int argc, char *argv[])
 	else {
 		std::cout << "读取成功： ";
 		for (unsigned int n = 0; n < value.size(); n++) {
-			std::cout.setf(ios::hex);
+			std::cout.setf(std::ios::hex);
 			std::cout << static_cast<unsigned char>(value.data()[n]);
-			std::cout.unsetf(ios::hex);
+			std::cout.unsetf(std::ios::hex);
 			std::cout << " ";
 		}
 		std::cout << std::endl;
