@@ -41,11 +41,6 @@
 
 void CGXCommunication::WriteValue(GX_TRACE_LEVEL trace, std::string line)
 {
-    if (trace > GX_TRACE_LEVEL_WARNING)
-    {
-        printf(line.c_str());
-    }
-    GXHelpers::Write("LogFile.txt", line);
 }
 
 
@@ -79,7 +74,7 @@ int CGXCommunication::Disconnect()
             (ret = ReadDataBlock(data, reply)) != 0)
         {
             //Show error but continue close.
-            printf("DisconnectRequest failed (%d) %s.\r\n", ret, CGXDLMSConverter::GetErrorMessage(ret));
+            fprintf(stderr, "DisconnectRequest failed (%d) %s.\r\n", ret, CGXDLMSConverter::GetErrorMessage(ret));
         }
     }
     return 0;
@@ -97,7 +92,7 @@ int CGXCommunication::Release()
             (ret = ReadDataBlock(data, reply)) != 0)
         {
             //Show error but continue close.
-            printf("DisconnectRequest failed (%d) %s.\r\n", ret, CGXDLMSConverter::GetErrorMessage(ret));
+            fprintf(stderr, "DisconnectRequest failed (%d) %s.\r\n", ret, CGXDLMSConverter::GetErrorMessage(ret));
         }
     }
     return 0;
@@ -118,7 +113,7 @@ int CGXCommunication::Close()
             (ret = ReadDataBlock(data, reply)) != 0)
         {
             //Show error but continue close.
-            printf("ReleaseRequest failed (%d) %s.\r\n", ret, CGXDLMSConverter::GetErrorMessage(ret));
+            fprintf(stderr, "ReleaseRequest failed (%d) %s.\r\n", ret, CGXDLMSConverter::GetErrorMessage(ret));
         }
     }
     */
@@ -128,7 +123,7 @@ int CGXCommunication::Close()
             (ret = ReadDataBlock(data, reply)) != 0)
         {
             //Show error but continue close.
-            printf("DisconnectRequest failed (%d) %s.\r\n", ret, CGXDLMSConverter::GetErrorMessage(ret));
+            fprintf(stderr, "DisconnectRequest failed (%d) %s.\r\n", ret, CGXDLMSConverter::GetErrorMessage(ret));
         }
     }
     if (m_hComPort != INVALID_HANDLE_VALUE)
@@ -146,6 +141,7 @@ int CGXCommunication::Close()
     {
 #if defined(_WIN32) || defined(_WIN64)//Windows includes
         closesocket(m_socket);
+        WSACleanup();
 #else
         close(m_socket);
 #endif
@@ -166,12 +162,33 @@ int CGXCommunication::Connect(const char* pAddress, unsigned short Port)
     Close();
     //create socket.
     int family = IsIPv6Address(pAddress) ? AF_INET6 : AF_INET;
+#if defined ( _WIN32 ) || defined ( _WIN64 )
+    WSADATA wsaData;
+    // Initialize Winsock
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != NO_ERROR) {
+        return DLMS_ERROR_CODE_INVALID_PARAMETER;
+    }
+#endif
     m_socket = socket(family, SOCK_STREAM, IPPROTO_IP);
     if (m_socket == -1)
     {
-        assert(0);
+#if defined ( _WIN32 ) || defined ( _WIN64 )
+        WSACleanup();
+#endif
+//        assert(0);
         return DLMS_ERROR_CODE_INVALID_PARAMETER;
     }
+#if defined ( _WIN32 ) || defined ( _WIN64 )
+    int timeout = this->m_WaitTime;
+    setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(int));
+    setsockopt(m_socket, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(int));
+#else
+    struct timeval timeout;
+    timeout.tv_sec = this->m_WaitTime / 1000;
+    timeout.tv_usec = 1000;
+    setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    setsockopt(m_socket, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+#endif
     sockaddr* add;
     int addSize;
     sockaddr_in6 addrIP6;
@@ -367,7 +384,7 @@ int CGXCommunication::Read(unsigned char eop, CGXByteBuffer& reply)
             {
                 if (readTime > m_WaitTime)
                 {
-                    printf("Read failed. Timeout occurred.\r\n");
+                    fprintf(stderr, "Read failed. Timeout occurred.\r\n");
                     return DLMS_ERROR_CODE_RECEIVE_FAILED;
                 }
                 readTime += 100;
@@ -376,12 +393,12 @@ int CGXCommunication::Read(unsigned char eop, CGXByteBuffer& reply)
             //If connection is closed.
             else if (errno == EBADF)
             {
-                printf("Read failed. Connection closed.\r\n");
+                fprintf(stderr, "Read failed. Connection closed.\r\n");
                 return DLMS_ERROR_CODE_RECEIVE_FAILED;
             }
             else
             {
-                printf("Read failed. %d.\r\n", errno);
+                fprintf(stderr, "Read failed. %d.\r\n", errno);
                 return DLMS_ERROR_CODE_RECEIVE_FAILED;
             }
         }
@@ -479,7 +496,7 @@ int CGXCommunication::Open(const char* settings, bool iec, int maxBaudrate)
         }
         else
         {
-            printf("Invalid parity :\"%s\"\r\n", tmp2.c_str());
+            fprintf(stderr, "Invalid parity :\"%s\"\r\n", tmp2.c_str());
             return DLMS_ERROR_CODE_INVALID_PARAMETER;
         }
         stopBits = atoi(tmp[2].substr(tmp[2].size() - 1, 1).c_str());
@@ -517,7 +534,7 @@ int CGXCommunication::Open(const char* settings, bool iec, int maxBaudrate)
         OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
     if (m_hComPort == INVALID_HANDLE_VALUE)
     {
-        printf("Failed to open serial port: \"%s\"\r\n", port.c_str());
+        fprintf(stderr, "Failed to open serial port: \"%s\"\r\n", port.c_str());
         return DLMS_ERROR_CODE_INVALID_PARAMETER;
     }
     dcb.DCBlength = sizeof(DCB);
@@ -572,14 +589,14 @@ int CGXCommunication::Open(const char* settings, bool iec, int maxBaudrate)
     m_hComPort = open(port.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (m_hComPort == -1) // if open is unsuccessful.
     {
-        printf("Failed to open serial port: \"%s\"\r\n", port.c_str());
+        fprintf(stderr, "Failed to open serial port: \"%s\"\r\n", port.c_str());
         return DLMS_ERROR_CODE_INVALID_PARAMETER;
     }
     else
     {
         if (!isatty(m_hComPort))
         {
-            printf("Failed to Open port. This is not a serial port.\r\n");
+            fprintf(stderr, "Failed to Open port. This is not a serial port.\r\n");
             return DLMS_ERROR_CODE_INVALID_PARAMETER;
         }
         memset(&options, 0, sizeof(options));
@@ -619,7 +636,7 @@ int CGXCommunication::Open(const char* settings, bool iec, int maxBaudrate)
         //options.c_cflag |= CRTSCTS;
         if (tcsetattr(m_hComPort, TCSAFLUSH, &options) != 0)
         {
-            printf("Failed to Open port. tcsetattr failed.\r\n");
+            fprintf(stderr, "Failed to Open port. tcsetattr failed.\r\n");
             return DLMS_ERROR_CODE_INVALID_PARAMETER;
         }
     }
@@ -632,15 +649,6 @@ int CGXCommunication::Open(const char* settings, bool iec, int maxBaudrate)
         strcpy(buff, "/?!\r\n");
 #endif
         len = (int)strlen(buff);
-        if (m_Trace > GX_TRACE_LEVEL_WARNING)
-        {
-            printf("\r\nTX:\t");
-            for (pos = 0; pos != len; ++pos)
-            {
-                printf("%.2X ", buff[pos]);
-            }
-            printf("\r\n");
-        }
 #if defined(_WIN32) || defined(_WIN64)
         ret = WriteFile(m_hComPort, buff, len, &sendSize, &m_osWrite);
         if (ret == 0)
@@ -658,7 +666,7 @@ int CGXCommunication::Open(const char* settings, bool iec, int maxBaudrate)
         ret = write(m_hComPort, buff, len);
         if (ret != len)
         {
-            printf("write failed %d\r\n", errno);
+            fprintf(stderr, "write failed %d\r\n", errno);
             return DLMS_ERROR_CODE_SEND_FAILED;
         }
 #endif
@@ -676,10 +684,6 @@ int CGXCommunication::Open(const char* settings, bool iec, int maxBaudrate)
             }
         }
 
-        if (m_Trace > GX_TRACE_LEVEL_WARNING)
-        {
-            printf("RX:\t%s\r\n", reply.ToHexString().c_str());
-        }
         if (reply.GetUInt8(&ch) != 0 || ch != '/')
         {
             //Send disc
@@ -707,7 +711,7 @@ int CGXCommunication::Open(const char* settings, bool iec, int maxBaudrate)
             ret = write(m_hComPort, buff, len);
             if (ret != len)
             {
-                printf("write failed %d\r\n", errno);
+                fprintf(stderr, "write failed %d\r\n", errno);
                 return DLMS_ERROR_CODE_SEND_FAILED;
             }
 #endif
@@ -786,15 +790,6 @@ int CGXCommunication::Open(const char* settings, bool iec, int maxBaudrate)
         buff[5] = 0x0A;
         len = 6;
         reply.Clear();
-        if (m_Trace > GX_TRACE_LEVEL_WARNING)
-        {
-            printf("\r\nTX: ");
-            for (pos = 0; pos != len; ++pos)
-            {
-                printf("%.2X ", buff[pos]);
-            }
-            printf("\r\n");
-        }
 #if defined(_WIN32) || defined(_WIN64)//Windows
         ret = WriteFile(m_hComPort, buff, len, &sendSize, &m_osWrite);
         if (ret == 0)
@@ -803,7 +798,7 @@ int CGXCommunication::Open(const char* settings, bool iec, int maxBaudrate)
             //If error occurs...
             if (err != ERROR_IO_PENDING)
             {
-                printf("WriteFile %d\r\n", err);
+                fprintf(stderr, "WriteFile %d\r\n", err);
                 return DLMS_ERROR_CODE_SEND_FAILED;
             }
             //Wait until data is actually sent
@@ -813,7 +808,7 @@ int CGXCommunication::Open(const char* settings, bool iec, int maxBaudrate)
         ret = write(m_hComPort, buff, len);
         if (ret != len)
         {
-            printf("write failed %dr\n", errno);
+            fprintf(stderr, "write failed %dr\n", errno);
             return DLMS_ERROR_CODE_SEND_FAILED;
         }
 #endif
@@ -821,13 +816,13 @@ int CGXCommunication::Open(const char* settings, bool iec, int maxBaudrate)
         //Some meters need this sleep. Do not remove.
         Sleep(200);
         dcb.BaudRate = baudRate;
-        printf("New baudrate %d\r\n", (int)dcb.BaudRate);
+        fprintf(stderr, "New baudrate %d\r\n", (int)dcb.BaudRate);
         dcb.ByteSize = 8;
         dcb.StopBits = ONESTOPBIT;
         dcb.Parity = NOPARITY;
         if ((ret = GXSetCommState(m_hComPort, &dcb)) != 0)
         {
-            printf("GXSetCommState failed %d\n", ret);
+            fprintf(stderr, "GXSetCommState failed %d\n", ret);
             return DLMS_ERROR_CODE_INVALID_PARAMETER;
         }
         //Some meters need this sleep. Do not remove.
@@ -842,7 +837,7 @@ int CGXCommunication::Open(const char* settings, bool iec, int maxBaudrate)
         cfsetispeed(&options, baudRate);
         if (tcsetattr(m_hComPort, TCSAFLUSH, &options) != 0)
         {
-            printf("Failed to Open port. tcsetattr failed %d.\r\n", errno);
+            fprintf(stderr, "Failed to Open port. tcsetattr failed %d.\r\n", errno);
             return DLMS_ERROR_CODE_INVALID_PARAMETER;
         }
         //Some meters need this sleep. Do not remove.
@@ -861,10 +856,6 @@ int CGXCommunication::UpdateFrameCounter()
     //Read frame counter if GeneralProtection is used.
     if (m_InvocationCounter != NULL && m_Parser->GetCiphering() != NULL && m_Parser->GetCiphering()->GetSecurity() != DLMS_SECURITY_NONE)
     {
-        if (m_Trace > GX_TRACE_LEVEL_WARNING)
-        {
-            printf("UpdateFrameCounter\r\n");
-        }
         m_Parser->SetProposedConformance((DLMS_CONFORMANCE)(m_Parser->GetProposedConformance() | DLMS_CONFORMANCE_GENERAL_PROTECTION));
         unsigned long add = m_Parser->GetClientAddress();
         DLMS_AUTHENTICATION auth = m_Parser->GetAuthentication();
@@ -880,7 +871,7 @@ int CGXCommunication::UpdateFrameCounter()
             (ret = ReadDataBlock(data, reply)) != 0 ||
             (ret = m_Parser->ParseUAResponse(reply.GetData())) != 0)
         {
-            printf("SNRMRequest failed %d.\r\n", ret);
+            fprintf(stderr, "SNRMRequest failed %d.\r\n", ret);
             return ret;
         }
         reply.Clear();
@@ -890,10 +881,10 @@ int CGXCommunication::UpdateFrameCounter()
         {
             if (ret == DLMS_ERROR_CODE_APPLICATION_CONTEXT_NAME_NOT_SUPPORTED)
             {
-                printf("Use Logical Name referencing is wrong. Change it!\r\n");
+                fprintf(stderr, "Use Logical Name referencing is wrong. Change it!\r\n");
                 return ret;
             }
-            printf("AARQRequest failed (%d) %s\r\n", ret, CGXDLMSConverter::GetErrorMessage(ret));
+            fprintf(stderr, "AARQRequest failed (%d) %s\r\n", ret, CGXDLMSConverter::GetErrorMessage(ret));
             return ret;
         }
         reply.Clear();
@@ -905,7 +896,7 @@ int CGXCommunication::UpdateFrameCounter()
         {
             m_Parser->GetCiphering()->SetInvocationCounter(1 + d.GetValue().ToInteger());
         }
-        printf("Invocation counter: %d\r\n", m_Parser->GetCiphering()->GetInvocationCounter());
+        fprintf(stderr, "Invocation counter: %d\r\n", m_Parser->GetCiphering()->GetInvocationCounter());
         reply.Clear();
         Disconnect();
         m_Parser->SetClientAddress(add);
@@ -925,10 +916,6 @@ int CGXCommunication::InitializeConnection()
     {
         return ret;
     }
-    if (m_Trace > GX_TRACE_LEVEL_WARNING)
-    {
-        printf("InitializeConnection\r\n");
-    }
     std::vector<CGXByteBuffer> data;
     CGXReplyData reply;
     //Get meter's send and receive buffers size.
@@ -936,7 +923,7 @@ int CGXCommunication::InitializeConnection()
         (ret = ReadDataBlock(data, reply)) != 0 ||
         (ret = m_Parser->ParseUAResponse(reply.GetData())) != 0)
     {
-        printf("SNRMRequest failed %d.\r\n", ret);
+        fprintf(stderr, "SNRMRequest failed %d.\r\n", ret);
         return ret;
     }
     reply.Clear();
@@ -946,10 +933,10 @@ int CGXCommunication::InitializeConnection()
     {
         if (ret == DLMS_ERROR_CODE_APPLICATION_CONTEXT_NAME_NOT_SUPPORTED)
         {
-            printf("Use Logical Name referencing is wrong. Change it!\r\n");
+            fprintf(stderr, "Use Logical Name referencing is wrong. Change it!\r\n");
             return ret;
         }
-        printf("AARQRequest failed (%d) %s\r\n", ret, CGXDLMSConverter::GetErrorMessage(ret));
+        fprintf(stderr, "AARQRequest failed (%d) %s\r\n", ret, CGXDLMSConverter::GetErrorMessage(ret));
         return ret;
     }
     reply.Clear();
@@ -960,7 +947,7 @@ int CGXCommunication::InitializeConnection()
             (ret = ReadDataBlock(data, reply)) != 0 ||
             (ret = m_Parser->ParseApplicationAssociationResponse(reply.GetData())) != 0)
         {
-            printf("Authentication failed (%d) %s\r\n", ret, CGXDLMSConverter::GetErrorMessage(ret));
+            fprintf(stderr, "Authentication failed (%d) %s\r\n", ret, CGXDLMSConverter::GetErrorMessage(ret));
             return ret;
         }
     }
@@ -972,20 +959,16 @@ int CGXCommunication::ReadDLMSPacket(CGXByteBuffer& data, CGXReplyData& reply)
 {
     int ret;
     CGXByteBuffer bb;
-    std::string tmp;
+    // std::string tmp;
     CGXReplyData notify;
     if (data.GetSize() == 0)
     {
         return DLMS_ERROR_CODE_OK;
     }
-    Now(tmp);
-    tmp = "TX:\t" + tmp;
-    tmp += "\t" + data.ToHexString();
-    if (m_Trace > GX_TRACE_LEVEL_INFO)
-    {
-        printf("%s\r\n", tmp.c_str());
-    }
-    GXHelpers::Write("traffic.txt", tmp + "\r\n");
+    // Now(tmp);
+    // tmp = "TX:\t" + tmp;
+    // tmp += "\t" + data.ToHexString();
+    // GXHelpers::Write("traffic.txt", tmp + "\r\n");
     int len = data.GetSize();
     if (m_hComPort != INVALID_HANDLE_VALUE)
     {
@@ -1024,7 +1007,7 @@ int CGXCommunication::ReadDLMSPacket(CGXByteBuffer& data, CGXReplyData& reply)
         ret = write(m_hComPort, data.GetData(), len);
         if (ret != len)
         {
-            printf("write failed %d\n", errno);
+            fprintf(stderr, "write failed %d\n", errno);
             return DLMS_ERROR_CODE_SEND_FAILED;
         }
         //Discards old data in the rx buffer.
@@ -1035,14 +1018,14 @@ int CGXCommunication::ReadDLMSPacket(CGXByteBuffer& data, CGXReplyData& reply)
     {
         //If error has occured
 #if defined(_WIN32) || defined(_WIN64)//If Windows
-        printf("send failed %d\n", WSAGetLastError());
+        fprintf(stderr, "send failed %d\n", WSAGetLastError());
 #else
-        printf("send failed %d\n", errno);
+        fprintf(stderr, "send failed %d\n", errno);
 #endif
         return DLMS_ERROR_CODE_SEND_FAILED;
     }
     // Loop until whole DLMS packet is received.
-    tmp = "";
+    // tmp = "";
     do
     {
         if (notify.GetData().GetSize() != 0)
@@ -1055,11 +1038,11 @@ int CGXCommunication::ReadDLMSPacket(CGXByteBuffer& data, CGXReplyData& reply)
                 CGXDLMSTranslator t(DLMS_TRANSLATOR_OUTPUT_TYPE_SIMPLE_XML);
                 if ((ret = t.DataToXml(notify.GetData(), xml)) != 0)
                 {
-                    printf("ERROR! DataToXml failed.");
+                    fprintf(stderr, "ERROR! DataToXml failed.");
                 }
                 else
                 {
-                    printf("%s\r\n", xml.c_str());
+                    fprintf(stderr, "%s\r\n", xml.c_str());
                 }
                 notify.Clear();
             }
@@ -1071,20 +1054,20 @@ int CGXCommunication::ReadDLMSPacket(CGXByteBuffer& data, CGXReplyData& reply)
             unsigned short pos = (unsigned short)bb.GetSize();
             if (Read(0x7E, bb) != 0)
             {
-                tmp += bb.ToHexString(pos, bb.GetSize() - pos, true);
-                printf("Read failed.\r\n%s", tmp.c_str());
+                // tmp += bb.ToHexString(pos, bb.GetSize() - pos, true);
+                // fprintf(stderr, "Read failed.\r\n%s", tmp.c_str());
                 return DLMS_ERROR_CODE_SEND_FAILED;
             }
-            if (tmp.size() == 0)
-            {
-                Now(tmp);
-                tmp = "RX:\t" + tmp + "\t";
-            }
-            else
-            {
-                tmp += " ";
-            }
-            tmp += bb.ToHexString(pos, bb.GetSize() - pos, true);
+            // if (tmp.size() == 0)
+            // {
+                // Now(tmp);
+                // tmp = "RX:\t" + tmp + "\t";
+            // }
+            // else
+            // {
+                // tmp += " ";
+            // }
+            // tmp += bb.ToHexString(pos, bb.GetSize() - pos, true);
         }
         else
         {
@@ -1092,31 +1075,27 @@ int CGXCommunication::ReadDLMSPacket(CGXByteBuffer& data, CGXReplyData& reply)
             if ((ret = recv(m_socket, (char*)m_Receivebuff, len, 0)) == -1)
             {
 #if defined(_WIN32) || defined(_WIN64)//If Windows
-                printf("recv failed %d\n", WSAGetLastError());
+                fprintf(stderr, "recv failed %d\n", WSAGetLastError());
 #else
-                printf("recv failed %d\n", errno);
+                fprintf(stderr, "recv failed %d\n", errno);
 #endif
                 return DLMS_ERROR_CODE_RECEIVE_FAILED;
             }
             bb.Set(m_Receivebuff, ret);
-            if (tmp.size() == 0)
-            {
-                Now(tmp);
-                tmp = "RX:\t" + tmp + "\t";
-            }
-            else
-            {
-                tmp += " ";
-            }
-            tmp += GXHelpers::BytesToHex(m_Receivebuff, ret);
+            // if (tmp.size() == 0)
+            // {
+                // Now(tmp);
+                // tmp = "RX:\t" + tmp + "\t";
+            // }
+            // else
+            // {
+                // tmp += " ";
+            // }
+            // tmp += GXHelpers::BytesToHex(m_Receivebuff, ret);
         }
     } while ((ret = m_Parser->GetData(bb, reply, notify)) == DLMS_ERROR_CODE_FALSE);
-    tmp += "\r\n";
-    if (m_Trace > GX_TRACE_LEVEL_INFO)
-    {
-        printf("%s", tmp.c_str());
-    }
-    GXHelpers::Write("traffic.txt", tmp);
+    // tmp += "\r\n";
+    // GXHelpers::Write("traffic.txt", tmp);
     if (ret == DLMS_ERROR_CODE_REJECTED)
     {
 #if defined(_WIN32) || defined(_WIN64)//Windows
@@ -1201,6 +1180,25 @@ int CGXCommunication::Read(CGXDLMSObject* pObject, int attributeIndex, std::stri
     CGXReplyData reply;
     //Read data from the meter.
     if ((ret = m_Parser->Read(pObject, attributeIndex, data)) != 0 ||
+        (ret = ReadDataBlock(data, reply)) != 0 ||
+        (ret = m_Parser->UpdateValue(*pObject, attributeIndex, reply.GetValue())) != 0)
+    {
+        return ret;
+    }
+
+    value = reply.GetData().ToString();
+    return DLMS_ERROR_CODE_OK;
+}
+
+//Read selected object.
+int CGXCommunication::Read(CGXDLMSObject* pObject, int attributeIndex, CGXByteBuffer *param, std::string& value)
+{
+    value.clear();
+    int ret;
+    std::vector<CGXByteBuffer> data;
+    CGXReplyData reply;
+    //Read data from the meter.
+    if ((ret = m_Parser->Read(pObject, attributeIndex, param, data)) != 0 ||
         (ret = ReadDataBlock(data, reply)) != 0 ||
         (ret = m_Parser->UpdateValue(*pObject, attributeIndex, reply.GetValue())) != 0)
     {
