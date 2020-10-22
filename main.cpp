@@ -18,23 +18,23 @@ struct element {
 
 struct parameter {
 	std::string device;
-	
+
 	uint8_t mode = 4;
     uint8_t client = 16;
     uint16_t logical = 1;
     uint16_t physical = 0;
 	DLMS_AUTHENTICATION level = DLMS_AUTHENTICATION_NONE;
 	bool negotiate = false;
-	
+
 	CGXByteBuffer password;
 	CGXByteBuffer ekey;
     CGXByteBuffer akey;
-	
+
 	std::vector<struct element> elements;
 };
 
 static void arg_error(char *name) {
-	static char *help_string = 
+	static char *help_string =
 	"%s: Valid parameters are:\n"
 	"  -d <device> - specify the serial device, like /dev/ttyS0:9600:8Even0 in unix or COM3:9600:8Even0 in windows\n"
 	"  -m <mode> - specify the address mode, value is one of 1, 2 or 4\n"
@@ -49,8 +49,9 @@ static void arg_error(char *name) {
 	"  -i <class> - specify the class id\n"
 	"  -o <obis> - specify the obis\n"
 	"  -t <attribute> - specify the attribute id\n"
-	"  -f <file> - specify a config file\n";
-	
+	"  -f <file> - specify a config file\n"
+	"  -h - get this message\n";
+
     fprintf(stderr, help_string, name);
     exit(1);
 }
@@ -121,7 +122,7 @@ static void prase_file(char *file, struct parameter& p) {
 				fprintf(stderr, "Invalid config file\n");
 				arg_error(file);
 			}
-			
+
 			/* Prease tag. */
 			std::vector<std::string>::iterator iter = line.begin();
 			std::string tag = *iter;
@@ -245,10 +246,10 @@ static void prase_file(char *file, struct parameter& p) {
 					fprintf(stderr, "Invalid config file: '%s'\n", tag.data());
 					exit(1);
 				}
-				
+
 				struct element e;
 				std::vector<std::string>::iterator iter = line.begin();
-				
+
 				/* Prease class ID. */
 				std::string id = *iter;
 				if(!id.empty()) {
@@ -264,7 +265,7 @@ static void prase_file(char *file, struct parameter& p) {
 				else {
 					e.classID = std::stoi(id);
 				}
-				
+
 				/* Prease OBIS. */
 				++ iter;
 				std::string obis = *iter;
@@ -287,7 +288,7 @@ static void prase_file(char *file, struct parameter& p) {
 					}
 				}
 				e.obis = obis;
-				
+
 				/* Prease attribute. */
 				++ iter;
 				std::string attr = *iter;
@@ -304,7 +305,7 @@ static void prase_file(char *file, struct parameter& p) {
 				else {
 					e.index = std::stoi(attr);
 				}
-				
+
 				/* Prease selects. */
 				if(line.size() == 4) {
 					++ iter;
@@ -321,7 +322,7 @@ static void prase_file(char *file, struct parameter& p) {
 					}
 					e.selects = selects;
 				}
-				
+
 				/* Push the element to vector. */
 				p.elements.push_back(e);
 			}
@@ -331,13 +332,13 @@ static void prase_file(char *file, struct parameter& p) {
 			}
 		}
 	}
-	
+
     return;
 }
 
 static void prase_para(int argc, char *argv[], struct parameter& p) {
 	struct element e;
-	
+
 	for (int i = 1; i < argc; i++) {
 		if ((argv[i][0] != '-') || (strlen(argv[i]) != 2)) {
 			fprintf(stderr, "Invalid argument: '%s'\n", argv[i]);
@@ -542,24 +543,28 @@ static void prase_para(int argc, char *argv[], struct parameter& p) {
 				prase_file(argv[i], p);
 				break;
 			}
+			case 'h': { /* Get help. */
+				arg_error(argv[0]);
+				break;
+			}
 			default: {
 				fprintf(stderr, "Invalid option: '%s'\n", argv[i]);
 				arg_error(argv[0]);
 			}
 		}
 	}
-	
+
 	/* Push the element to vector. */
 	if((e.classID != 0) && (e.obis.size() > 10) && (e.index != 0)) {
 		p.elements.push_back(e);
 	}
-	
+
 	/* Check if the device string is valid. */
 	if(p.device.size() < 15) {
 		fprintf(stderr, "Device should be specified correctly\n");
 		exit(1);
 	}
-	
+
 	/* Check if the password is valid when the access level is DLMS_AUTHENTICATION_LOW. */
 	if(p.level == DLMS_AUTHENTICATION_LOW) {
 		if(p.password.GetSize() < 8) {
@@ -574,24 +579,24 @@ static void prase_para(int argc, char *argv[], struct parameter& p) {
 			exit(1);
 		}
 	}
-	
+
 	/* Check if the elements is empty. */
 	if(p.elements.size() < 1) {
 		fprintf(stderr, "At least 1 element should be specified\n");
 		exit(1);
 	}
-	
+
     return;
 }
 
 
 int main(int argc, char *argv[]) {
 	struct parameter param;
-	
+
 	prase_para(argc, argv, param);
-	
+
 	CGXDLMSSecureClient *cl;
-	
+
     if(param.mode == 1) {
         if(param.level == DLMS_AUTHENTICATION_LOW) {
             cl = new CGXDLMSSecureClient(true,
@@ -678,18 +683,18 @@ int main(int argc, char *argv[]) {
                                    ));
 
     cl->SetAutoIncreaseInvokeID(false);
-	
+
     CGXByteBuffer bb;
-	
-    bb.Clear();
-    bb.SetHexString("415A534552564552");
+
+	bb.Clear();
+	bb.SetHexString("415A534552564552");
 	cl->GetCiphering()->SetSystemTitle(bb);
-    bb.Clear();
+	bb.Clear();
 	bb.SetHexString("31323334353637383132333435363738");
 	cl->GetCiphering()->SetDedicatedKey(bb);
 	cl->GetCiphering()->SetAuthenticationKey(param.akey);
 	cl->GetCiphering()->SetBlockCipherKey(param.ekey);
-	
+
 	CGXCommunication *comm;
 	comm = new CGXCommunication(cl, 6000, GX_TRACE_LEVEL_OFF, nullptr);
 
@@ -707,14 +712,14 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "Failed to initialize the link layer\n");
         return -1;
     }
-	
+
 	for(std::vector<struct element>::iterator iter = param.elements.begin(); iter != param.elements.end(); iter++) {
 		CGXDLMSCommon Object(iter->classID, iter->obis.data());
 		CGXByteBuffer selects;
 		selects.Clear();
         selects.SetHexString(iter->selects.data());
 		std::string result;
-		
+
 		if(comm->Read(&Object, iter->index, &selects, result) != DLMS_ERROR_CODE_OK) {
 			fprintf(stdout, "NULL ");
 		}
