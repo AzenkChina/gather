@@ -1,15 +1,26 @@
-SRC_DIR := ./
-SRC := $(wildcard $(SRC_DIR)/*.cpp)
-OBJ := $(SRC:$(SRC_DIR)/%.cpp=$(SRC_DIR)/%.o)
-
+#PLAT     = WINDOWS
+#PLAT     = LINUX
 CXX      = g++
 CC       = gcc
 RM       = rm -f
 
-LIBS     = -lpthread -lrt -lDLMS
-INCS     = 
+ifndef PLAT
+PLAT     = LINUX
+endif
+ifeq ($(PLAT), LINUX)
+LIBS     = -lpthread -lrt -L"./" -lDLMS
 BIN      = gather
+endif
+ifeq ($(PLAT), WINDOWS)
+LIBS     = -lws2_32 -lWinmm -L"./" libDLMS.dll
+BIN      = gather.exe
+endif
+INCS     = 
 CFLAGS   = $(INCS) -Os -Wall
+
+SRC_DIR := ./
+SRC := $(wildcard $(SRC_DIR)/*.cpp)
+OBJ := $(SRC:$(SRC_DIR)/%.cpp=$(SRC_DIR)/%.o)
 
 
 .PHONY: all all-before all-after clean clean-custom
