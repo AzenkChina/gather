@@ -36,7 +36,7 @@ struct parameter {
 static void arg_error(char *name) {
 	static char *help_string =
 	"%s: Valid parameters are:\n"
-	"  -d <device> - specify the serial device, like /dev/ttyS0:9600:8Even0 in unix or COM3:9600:8Even0 in windows\n"
+	"  -d <device> - specify the serial device, like /dev/ttyS1:9600:8Even0 in unix or COM3:9600:8Even0 in windows\n"
 	"  -m <mode> - specify the address mode, value is one of 1, 2 or 4\n"
 	"  -c <client> - specify the client address, range is 1~127, default is 16\n"
 	"  -l <logical> - specify the logical address, range is 1~16383, default is 1\n"
@@ -338,6 +338,10 @@ static void prase_file(char *file, struct parameter& p) {
 
 static void prase_para(int argc, char *argv[], struct parameter& p) {
 	struct element e;
+
+	if(argc <= 1) {
+		arg_error(argv[0]);
+	}
 
 	for (int i = 1; i < argc; i++) {
 		if ((argv[i][0] != '-') || (strlen(argv[i]) != 2)) {
@@ -732,6 +736,7 @@ int main(int argc, char *argv[]) {
 	}
 	fprintf(stdout, "\n");
 
+	comm->Close();
 	delete comm;
 	delete cl;
     return 0;
