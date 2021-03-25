@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <time.h>
 #include "communication.h"
 #include "dlms/include/GXDLMSCommon.h"
 #include "dlms/include/GXBytebuffer.h"
@@ -13,7 +14,7 @@ struct element {
     uint16_t classID = 0;
     std::string obis;
     uint8_t index = 0;
-	std::string selects;
+	CGXByteBuffer selects;
 };
 
 struct parameter {
@@ -49,6 +50,7 @@ static void arg_error(char *name) {
 	"  -i <class> - specify the class id\n"
 	"  -o <obis> - specify the obis\n"
 	"  -t <attribute> - specify the attribute id\n"
+	"  -r <from-to> - specify the select parameter, can be entrys(0~65535) or timestep(>=946684800)\n"
 	"  -f <file> - specify a config file\n"
 	"  -h - get this message\n";
 
@@ -56,13 +58,13 @@ static void arg_error(char *name) {
     exit(1);
 }
 
-static void split(const std::string& s, std::vector<int>& sv, const char flag = ' ') {
+static void split(const std::string& s, std::vector<long long>& sv, const char flag = ' ') {
     sv.clear();
     std::istringstream iss(s);
     std::string temp;
 
     while (std::getline(iss, temp, flag)) {
-        sv.push_back(std::stoi(temp));
+        sv.push_back(std::stoll(temp));
     }
     return;
 }
@@ -275,7 +277,7 @@ static void prase_file(char *file, struct parameter& p) {
 				if(!obis.empty()) {
 					obis.erase(obis.find_last_not_of(" ") + 1);
 				}
-				std::vector<int> sv;
+				std::vector<long long> sv;
 				split(obis, sv, '.');
 				if(sv.size() != 6) {
 					fprintf(stderr, "Invalid config file: '%s'\n", tag.data());
@@ -316,11 +318,98 @@ static void prase_file(char *file, struct parameter& p) {
 					if(!selects.empty()) {
 						selects.erase(selects.find_last_not_of(" ") + 1);
 					}
-					if((selects.size() < 1) || (selects.size() % 2)) {
+					if(selects.size() < 3) {
 						fprintf(stderr, "Invalid config file: '%s'\n", tag.data());
 						exit(1);
 					}
-					e.selects = selects;
+					std::vector<long long> sv;
+					split(selects, sv, '-');
+					if(sv.size() != 2) {
+						fprintf(stderr, "Invalid config file: '%s'\n", tag.data());
+						exit(1);
+					}
+					if((sv[0] < 0) || (sv[1] < 0)) {
+						fprintf(stderr, "Invalid config file: '%s'\n", tag.data());
+						exit(1);
+					}
+					if(sv[1] < sv[0]) {
+						fprintf(stderr, "Invalid config file: '%s'\n", tag.data());
+						exit(1);
+					}
+					CGXByteBuffer value;
+					value.Clear();
+					if((sv[0] < 65536) && (sv[1] < 65536)) {
+						value.SetUInt8(2);//by entry
+						value.SetUInt8(DLMS_DATA_TYPE_STRUCTURE);
+						value.SetUInt8(4);
+						//from entry
+						value.SetUInt8(DLMS_DATA_TYPE_UINT32);
+						value.SetUInt32(sv[0]);
+						//to entry
+						value.SetUInt8(DLMS_DATA_TYPE_UINT32);
+						value.SetUInt32(sv[1]);
+						//from selected value
+						value.SetUInt8(DLMS_DATA_TYPE_UINT16);
+						value.SetUInt16(0);
+						//to selected value
+						value.SetUInt8(DLMS_DATA_TYPE_UINT16);
+						value.SetUInt16(0);
+					}
+					else if((sv[0] >= 946684800) && (sv[1] >= 946684800)) {
+						struct tm t;
+						value.SetUInt8(1);//by range
+						value.SetUInt8(DLMS_DATA_TYPE_STRUCTURE);
+						value.SetUInt8(4);
+						//restricting object
+						value.SetUInt8(DLMS_DATA_TYPE_STRUCTURE);
+						value.SetUInt8(4);
+						value.SetUInt8(DLMS_DATA_TYPE_UINT16);
+						value.SetUInt16(8);
+						value.SetUInt8(DLMS_DATA_TYPE_OCTET_STRING);
+						value.SetUInt8(6);
+						value.SetHexString("0000010000FF");
+						value.SetUInt8(DLMS_DATA_TYPE_INT8);
+						value.SetUInt8(2);
+						value.SetUInt8(DLMS_DATA_TYPE_UINT16);
+						value.SetUInt16(0);
+						//from
+						struct tm *from = gmtime(static_cast<const time_t *>(&sv[0]));
+						value.SetUInt8(DLMS_DATA_TYPE_OCTET_STRING);
+						value.SetUInt8(12);
+						value.SetUInt16(from->tm_year + 1900);
+						value.SetUInt8(from->tm_mon + 1);
+						value.SetUInt8(from->tm_mday);
+						value.SetUInt8(0xff);
+						value.SetUInt8(from->tm_hour);
+						value.SetUInt8(from->tm_min);
+						value.SetUInt8(from->tm_sec);
+						value.SetUInt8(0);
+						value.SetUInt16(0x8000);
+						value.SetUInt8(0);
+						//to
+						struct tm *to = gmtime(static_cast<const time_t *>(&sv[1]));
+						value.SetUInt8(DLMS_DATA_TYPE_OCTET_STRING);
+						value.SetUInt8(12);
+						value.SetUInt16(to->tm_year + 1900);
+						value.SetUInt8(to->tm_mon + 1);
+						value.SetUInt8(to->tm_mday);
+						value.SetUInt8(0xff);
+						value.SetUInt8(to->tm_hour);
+						value.SetUInt8(to->tm_min);
+						value.SetUInt8(to->tm_sec);
+						value.SetUInt8(0);
+						value.SetUInt16(0x8000);
+						value.SetUInt8(0);
+						//selected values
+						value.SetUInt8(DLMS_DATA_TYPE_ARRAY);
+						value.SetUInt8(0);
+					}
+					else {
+						fprintf(stderr, "Invalid config file: '%s'\n", tag.data());
+						exit(1);
+					}
+
+					e.selects = value;
 				}
 
 				/* Push the element to vector. */
@@ -508,7 +597,7 @@ static void prase_para(int argc, char *argv[], struct parameter& p) {
 					fprintf(stderr, "Invalid argument: '%s'\n", argv[i]);
 					arg_error(argv[0]);
 				}
-				std::vector<int> sv;
+				std::vector<long long> sv;
 				split(argv[i], sv, '.');
 				if(sv.size() != 6) {
 					fprintf(stderr, "Invalid argument: '%s'\n", argv[i]);
@@ -536,6 +625,102 @@ static void prase_para(int argc, char *argv[], struct parameter& p) {
 				else {
 					e.index = std::stoi(argv[i]);
 				}
+				break;
+			}
+			case 'r': { /* Get the select parameter. */
+				i++;
+				if (i == argc) {
+					fprintf(stderr, "Invalid argument: '%s'\n", argv[i]);
+					arg_error(argv[0]);
+				}
+				std::vector<long long> sv;
+				split(argv[i], sv, '-');
+				if(sv.size() != 2) {
+					fprintf(stderr, "Invalid argument: '%s'\n", argv[i]);
+					arg_error(argv[0]);
+				}
+				if((sv[0] < 0) || (sv[1] < 0)) {
+					fprintf(stderr, "Invalid argument: '%s'\n", argv[i]);
+					arg_error(argv[0]);
+				}
+				if(sv[1] < sv[0]) {
+					fprintf(stderr, "Invalid argument: '%s'\n", argv[i]);
+					arg_error(argv[0]);
+				}
+				CGXByteBuffer value;
+				value.Clear();
+				if((sv[0] < 65536) && (sv[1] < 65536)) {
+					value.SetUInt8(2);//by entry
+					value.SetUInt8(DLMS_DATA_TYPE_STRUCTURE);
+					value.SetUInt8(4);
+					//from entry
+					value.SetUInt8(DLMS_DATA_TYPE_UINT32);
+					value.SetUInt32(sv[0]);
+					//to entry
+					value.SetUInt8(DLMS_DATA_TYPE_UINT32);
+					value.SetUInt32(sv[1]);
+					//from selected value
+					value.SetUInt8(DLMS_DATA_TYPE_UINT16);
+					value.SetUInt16(0);
+					//to selected value
+					value.SetUInt8(DLMS_DATA_TYPE_UINT16);
+					value.SetUInt16(0);
+				}
+				else if((sv[0] >= 946684800) && (sv[1] >= 946684800)) {
+					struct tm t;
+					value.SetUInt8(1);//by range
+					value.SetUInt8(DLMS_DATA_TYPE_STRUCTURE);
+					value.SetUInt8(4);
+					//restricting object
+					value.SetUInt8(DLMS_DATA_TYPE_STRUCTURE);
+					value.SetUInt8(4);
+					value.SetUInt8(DLMS_DATA_TYPE_UINT16);
+					value.SetUInt16(8);
+					value.SetUInt8(DLMS_DATA_TYPE_OCTET_STRING);
+					value.SetUInt8(6);
+					value.SetHexString("0000010000FF");
+					value.SetUInt8(DLMS_DATA_TYPE_INT8);
+					value.SetUInt8(2);
+					value.SetUInt8(DLMS_DATA_TYPE_UINT16);
+					value.SetUInt16(0);
+					//from
+					struct tm *from = gmtime(static_cast<const time_t *>(&sv[0]));
+					value.SetUInt8(DLMS_DATA_TYPE_OCTET_STRING);
+					value.SetUInt8(12);
+					value.SetUInt16(from->tm_year + 1900);
+					value.SetUInt8(from->tm_mon + 1);
+					value.SetUInt8(from->tm_mday);
+					value.SetUInt8(0xff);
+					value.SetUInt8(from->tm_hour);
+					value.SetUInt8(from->tm_min);
+					value.SetUInt8(from->tm_sec);
+					value.SetUInt8(0);
+					value.SetUInt16(0x8000);
+					value.SetUInt8(0);
+					//to
+					struct tm *to = gmtime(static_cast<const time_t *>(&sv[1]));
+					value.SetUInt8(DLMS_DATA_TYPE_OCTET_STRING);
+					value.SetUInt8(12);
+					value.SetUInt16(to->tm_year + 1900);
+					value.SetUInt8(to->tm_mon + 1);
+					value.SetUInt8(to->tm_mday);
+					value.SetUInt8(0xff);
+					value.SetUInt8(to->tm_hour);
+					value.SetUInt8(to->tm_min);
+					value.SetUInt8(to->tm_sec);
+					value.SetUInt8(0);
+					value.SetUInt16(0x8000);
+					value.SetUInt8(0);
+					//selected values
+					value.SetUInt8(DLMS_DATA_TYPE_ARRAY);
+					value.SetUInt8(0);
+				}
+				else {
+					fprintf(stderr, "Invalid argument: '%s'\n", argv[i]);
+					arg_error(argv[0]);
+				}
+				
+				e.selects = value;
 				break;
 			}
 			case 'f': { /* Get configs from file. */
@@ -719,12 +904,9 @@ int main(int argc, char *argv[]) {
 
 	for(std::vector<struct element>::iterator iter = param.elements.begin(); iter != param.elements.end(); iter++) {
 		CGXDLMSCommon Object(iter->classID, iter->obis.data());
-		CGXByteBuffer selects;
-		selects.Clear();
-        selects.SetHexString(iter->selects.data());
 		std::string result;
 
-		if(comm->Read(&Object, iter->index, &selects, result) != DLMS_ERROR_CODE_OK) {
+		if(comm->Read(&Object, iter->index, &iter->selects, result) != DLMS_ERROR_CODE_OK) {
 			fprintf(stdout, "NULL ");
 		}
 		else {
