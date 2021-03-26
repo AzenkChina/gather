@@ -356,7 +356,6 @@ static void prase_file(char *file, struct parameter& p) {
 						value.SetUInt16(0);
 					}
 					else if((sv[0] >= 946684800) && (sv[1] >= 946684800)) {
-						struct tm t;
 						value.SetUInt8(1);//by range
 						value.SetUInt8(DLMS_DATA_TYPE_STRUCTURE);
 						value.SetUInt8(4);
@@ -373,7 +372,7 @@ static void prase_file(char *file, struct parameter& p) {
 						value.SetUInt8(DLMS_DATA_TYPE_UINT16);
 						value.SetUInt16(0);
 						//from
-						struct tm *from = gmtime(static_cast<const time_t *>(&sv[0]));
+						struct tm *from = gmtime(reinterpret_cast<const time_t *>(&sv[0]));
 						value.SetUInt8(DLMS_DATA_TYPE_OCTET_STRING);
 						value.SetUInt8(12);
 						value.SetUInt16(from->tm_year + 1900);
@@ -387,7 +386,7 @@ static void prase_file(char *file, struct parameter& p) {
 						value.SetUInt16(0x8000);
 						value.SetUInt8(0);
 						//to
-						struct tm *to = gmtime(static_cast<const time_t *>(&sv[1]));
+						struct tm *to = gmtime(reinterpret_cast<const time_t *>(&sv[1]));
 						value.SetUInt8(DLMS_DATA_TYPE_OCTET_STRING);
 						value.SetUInt8(12);
 						value.SetUInt16(to->tm_year + 1900);
@@ -667,7 +666,6 @@ static void prase_para(int argc, char *argv[], struct parameter& p) {
 					value.SetUInt16(0);
 				}
 				else if((sv[0] >= 946684800) && (sv[1] >= 946684800)) {
-					struct tm t;
 					value.SetUInt8(1);//by range
 					value.SetUInt8(DLMS_DATA_TYPE_STRUCTURE);
 					value.SetUInt8(4);
@@ -684,7 +682,7 @@ static void prase_para(int argc, char *argv[], struct parameter& p) {
 					value.SetUInt8(DLMS_DATA_TYPE_UINT16);
 					value.SetUInt16(0);
 					//from
-					struct tm *from = gmtime(static_cast<const time_t *>(&sv[0]));
+					struct tm *from = gmtime(reinterpret_cast<const time_t *>(&sv[0]));
 					value.SetUInt8(DLMS_DATA_TYPE_OCTET_STRING);
 					value.SetUInt8(12);
 					value.SetUInt16(from->tm_year + 1900);
@@ -698,7 +696,7 @@ static void prase_para(int argc, char *argv[], struct parameter& p) {
 					value.SetUInt16(0x8000);
 					value.SetUInt8(0);
 					//to
-					struct tm *to = gmtime(static_cast<const time_t *>(&sv[1]));
+					struct tm *to = gmtime(reinterpret_cast<const time_t *>(&sv[1]));
 					value.SetUInt8(DLMS_DATA_TYPE_OCTET_STRING);
 					value.SetUInt8(12);
 					value.SetUInt16(to->tm_year + 1900);
