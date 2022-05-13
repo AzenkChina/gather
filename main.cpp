@@ -846,30 +846,31 @@ int main(int argc, char *argv[]) {
     }
 
     cl->SetProposedConformance(static_cast<DLMS_CONFORMANCE>(\
-                                   DLMS_CONFORMANCE_GENERAL_PROTECTION | \
-                                   DLMS_CONFORMANCE_GENERAL_BLOCK_TRANSFER | \
-                                   DLMS_CONFORMANCE_READ | \
-                                   DLMS_CONFORMANCE_WRITE | \
-                                   DLMS_CONFORMANCE_UN_CONFIRMED_WRITE | \
-                                   DLMS_CONFORMANCE_ATTRIBUTE_0_SUPPORTED_WITH_SET | \
-                                   DLMS_CONFORMANCE_PRIORITY_MGMT_SUPPORTED | \
-                                   DLMS_CONFORMANCE_ATTRIBUTE_0_SUPPORTED_WITH_GET | \
+                                   /* DLMS_CONFORMANCE_GENERAL_PROTECTION | \ */
+                                   /* DLMS_CONFORMANCE_GENERAL_BLOCK_TRANSFER | \ */
+                                   /* DLMS_CONFORMANCE_READ | \ */
+                                   /* DLMS_CONFORMANCE_WRITE | \ */
+                                   /* DLMS_CONFORMANCE_UN_CONFIRMED_WRITE | \ */
+                                   /* DLMS_CONFORMANCE_ATTRIBUTE_0_SUPPORTED_WITH_SET | \ */
+                                   /* DLMS_CONFORMANCE_PRIORITY_MGMT_SUPPORTED | \ */
+                                   /* DLMS_CONFORMANCE_ATTRIBUTE_0_SUPPORTED_WITH_GET | \ */
                                    DLMS_CONFORMANCE_BLOCK_TRANSFER_WITH_GET_OR_READ | \
                                    DLMS_CONFORMANCE_BLOCK_TRANSFER_WITH_SET_OR_WRITE | \
                                    DLMS_CONFORMANCE_BLOCK_TRANSFER_WITH_ACTION | \
                                    DLMS_CONFORMANCE_MULTIPLE_REFERENCES | \
-                                   DLMS_CONFORMANCE_INFORMATION_REPORT | \
-                                   DLMS_CONFORMANCE_DATA_NOTIFICATION | \
+                                   /* DLMS_CONFORMANCE_INFORMATION_REPORT | \ */
+                                   /* DLMS_CONFORMANCE_DATA_NOTIFICATION | \ */
                                    DLMS_CONFORMANCE_ACCESS | \
                                    DLMS_CONFORMANCE_PARAMETERIZED_ACCESS | \
                                    DLMS_CONFORMANCE_GET | \
                                    DLMS_CONFORMANCE_SET | \
                                    DLMS_CONFORMANCE_SELECTIVE_ACCESS | \
-                                   DLMS_CONFORMANCE_EVENT_NOTIFICATION | \
+                                   /* DLMS_CONFORMANCE_EVENT_NOTIFICATION | \ */
                                    DLMS_CONFORMANCE_ACTION\
                                    ));
 
     cl->SetAutoIncreaseInvokeID(false);
+	cl->SetServiceClass(DLMS_SERVICE_CLASS_CONFIRMED);
 
     CGXByteBuffer bb;
 
